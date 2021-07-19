@@ -56,7 +56,7 @@ jobs:
   - script: |
       set -e
       AGENT_VERSION="$(version)" script/build.bash
-      dist/cli/$(version)/linux/amd64/deviceplane-agent --help
+      dist/agent/$(version)/linux/amd64/deviceplane-agent --help
     displayName: 'Build binaries'
 
 #  - task: AzureCLI@2

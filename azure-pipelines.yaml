@@ -1,0 +1,72 @@
+trigger:
+  tags:
+    include:
+    - v*
+  branches:
+    include:
+    - master
+  paths:
+    exclude:
+    - README.md
+    - CHANGELOG.md
+
+variables:
+  jobuuid: $(Build.BuildId)$(Agent.Id)
+  build: $(Build.BuildId)
+  ref: $(Build.SourceBranch)
+  commit: $(Build.SourceVersion)
+  branch: $(Build.SourceBranchName)
+  isTaggedCommit: 'no'
+  version:
+  GOROOT: '/usr/local/go1.16'
+  GOPATH: '/tmp/go'
+  GOBIN:  '$(GOPATH)/bin'
+
+jobs:
+- job: TestAndPush
+  pool:
+    vmImage: 'Ubuntu-18.04'
+
+  steps:
+  - script: |
+      set -e
+      VERS=$(echo $(commit) | cut -c1-20)
+      if [[ $(ref) == refs/tags* ]]; then
+        VERS=$(echo $(ref) | sed "s|refs/tags/v||g")
+        echo "##vso[task.setvariable variable=isTaggedCommit]yes"
+      fi
+      echo "##vso[task.setvariable variable=version]$VERS"
+      echo "Version: $VERS"
+    displayName: 'Set git/version variables'
+
+  - script: |
+      set -e
+      mkdir -p '$(GOBIN)'
+      mkdir -p '$(GOPATH)/pkg'
+      echo '##vso[task.prependpath]$(GOBIN)'
+      echo '##vso[task.prependpath]$(GOROOT)/bin'
+    displayName: 'Set up the Go workspace'
+  - task: GoTool@0
+    inputs:
+      version: '1.16'
+      goPath: $(GOPATH)
+      goBin: $(GOBIN)
+    displayName: 'Install Golang'
+
+  - script: |
+      set -e
+      AGENT_VERSION="$(version)" script/build.bash
+      dist/cli/$(version)/linux/amd64/deviceplane-agent --help
+    displayName: 'Build binaries'
+
+#  - task: AzureCLI@2
+#    condition: eq(variables.isTaggedCommit, 'yes')
+#    displayName: Upload binaries to Azure
+#    inputs:
+#      azureSubscription: AzureSubscription
+#      scriptType: bash
+#      scriptLocation: inlineScript
+#      inlineScript: |
+#        set -e
+#        az storage blob upload-batch -d downloads/cli -s ./dist/cli/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)
+#        az storage blob upload-batch -d downloads/cli/latest -s ./dist/cli/$(version)/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)

@@ -59,14 +59,14 @@ jobs:
       dist/agent/$(version)/linux/amd64/deviceplane-agent --help
     displayName: 'Build binaries'
 
-#  - task: AzureCLI@2
-#    condition: eq(variables.isTaggedCommit, 'yes')
-#    displayName: Upload binaries to Azure
-#    inputs:
-#      azureSubscription: AzureSubscription
-#      scriptType: bash
-#      scriptLocation: inlineScript
-#      inlineScript: |
-#        set -e
-#        az storage blob upload-batch -d downloads/cli -s ./dist/cli/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)
-#        az storage blob upload-batch -d downloads/cli/latest -s ./dist/cli/$(version)/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)
+  - task: AzureCLI@2
+    condition: eq(variables.isTaggedCommit, 'yes')
+    displayName: Upload binaries to Azure
+    inputs:
+      azureSubscription: AzureSubscription
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -e
+        az storage blob upload-batch -d downloads/agent -s ./dist/agent/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)
+        az storage blob upload-batch -d downloads/agent/latest -s ./dist/agent/$(version)/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)

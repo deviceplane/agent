@@ -60,8 +60,7 @@ jobs:
     displayName: 'Build binaries'
 
   - task: AzureCLI@2
-    condition: eq(variables.isTaggedCommit, 'yes')
-    displayName: Upload binaries to Azure
+    displayName: Upload versioned binaries to Azure
     inputs:
       azureSubscription: AzureSubscription
       scriptType: bash
@@ -69,4 +68,14 @@ jobs:
       inlineScript: |
         set -e
         az storage blob upload-batch -d downloads/agent -s ./dist/agent/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)
+
+  - task: AzureCLI@2
+    condition: eq(variables.isTaggedCommit, 'yes')
+    displayName: Upload latest binaries to Azure
+    inputs:
+      azureSubscription: AzureSubscription
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -e
         az storage blob upload-batch -d downloads/agent/latest -s ./dist/agent/$(version)/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)

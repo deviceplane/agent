@@ -21,61 +21,117 @@ variables:
   GOROOT: '/usr/local/go1.16'
   GOPATH: '/tmp/go'
   GOBIN:  '$(GOPATH)/bin'
+  dp.cli.version: "3.0.0"
 
-jobs:
-- job: TestAndPush
-  pool:
-    vmImage: 'Ubuntu-18.04'
+stages:
+- stage: Test
+  jobs:
+  - job: TestAndPush
+    pool:
+      vmImage: 'Ubuntu-18.04'
 
-  steps:
-  - script: |
-      set -e
-      VERS=$(echo $(commit) | cut -c1-20)
-      if [[ $(ref) == refs/tags* ]]; then
-        VERS=$(echo $(ref) | sed "s|refs/tags/v||g")
-        echo "##vso[task.setvariable variable=isTaggedCommit]yes"
-      fi
-      echo "##vso[task.setvariable variable=version]$VERS"
-      echo "Version: $VERS"
-    displayName: 'Set git/version variables'
-
-  - script: |
-      set -e
-      mkdir -p '$(GOBIN)'
-      mkdir -p '$(GOPATH)/pkg'
-      echo '##vso[task.prependpath]$(GOBIN)'
-      echo '##vso[task.prependpath]$(GOROOT)/bin'
-    displayName: 'Set up the Go workspace'
-  - task: GoTool@0
-    inputs:
-      version: '1.16'
-      goPath: $(GOPATH)
-      goBin: $(GOBIN)
-    displayName: 'Install Golang'
-
-  - script: |
-      set -e
-      AGENT_VERSION="$(version)" script/build.bash
-      dist/agent/$(version)/linux/amd64/deviceplane-agent --help
-    displayName: 'Build binaries'
-
-  - task: AzureCLI@2
-    displayName: Upload versioned binaries to Azure
-    inputs:
-      azureSubscription: AzureSubscription
-      scriptType: bash
-      scriptLocation: inlineScript
-      inlineScript: |
+    steps:
+    - script: |
         set -e
-        az storage blob upload-batch -d downloads/agent -s ./dist/agent/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)
+        VERS=$(echo $(commit) | cut -c1-20)
+        if [[ $(ref) == refs/tags* ]]; then
+          VERS=$(echo $(ref) | sed "s|refs/tags/v||g")
+          echo "##vso[task.setvariable variable=isTaggedCommit]yes"
+        fi
+        echo "##vso[task.setvariable variable=version]$VERS"
+        echo "Version: $VERS"
+      displayName: 'Set git/version variables'
 
-  - task: AzureCLI@2
-    condition: eq(variables.isTaggedCommit, 'yes')
-    displayName: Upload latest binaries to Azure
-    inputs:
-      azureSubscription: AzureSubscription
-      scriptType: bash
-      scriptLocation: inlineScript
-      inlineScript: |
+    - script: |
         set -e
-        az storage blob upload-batch -d downloads/agent/latest -s ./dist/agent/$(version)/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)
+        mkdir -p '$(GOBIN)'
+        mkdir -p '$(GOPATH)/pkg'
+        echo '##vso[task.prependpath]$(GOBIN)'
+        echo '##vso[task.prependpath]$(GOROOT)/bin'
+      displayName: 'Set up the Go workspace'
+    - task: GoTool@0
+      inputs:
+        version: '1.16'
+        goPath: $(GOPATH)
+        goBin: $(GOBIN)
+      displayName: 'Install Golang'
+
+    - script: |
+        set -e
+        AGENT_VERSION="$(version)" script/build.bash
+        dist/agent/$(version)/linux/amd64/deviceplane-agent --help
+      displayName: 'Build binaries'
+
+    - task: AzureCLI@2
+      displayName: Upload versioned binaries to Azure
+      inputs:
+        azureSubscription: AzureSubscription
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          set -e
+          az storage blob upload-batch -d downloads/agent -s ./dist/agent/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)
+
+    - task: AzureCLI@2
+      condition: eq(variables.isTaggedCommit, 'yes')
+      displayName: Upload latest binaries to Azure
+      inputs:
+        azureSubscription: AzureSubscription
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          set -e
+          az storage blob upload-batch -d downloads/agent/latest -s ./dist/agent/$(version)/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)
+
+- stage: Test
+  jobs:
+  - job: Test
+    pool:
+      vmImage: 'Ubuntu-18.04'
+  
+    steps:
+    - checkout: self
+      submodules: true
+
+    - script: |
+        set -e
+        VERS=$(echo $(commit) | cut -c1-20)
+        if [[ $(ref) == refs/tags* ]]; then
+          VERS=$(echo $(ref) | sed "s|refs/tags/v||g")
+        fi
+        echo "##vso[task.setvariable variable=version]$VERS"
+        echo "Version: $VERS"
+      displayName: 'Set git/version variables'
+
+    - bash: |
+        set -e
+        ./bootstrap.bash
+      displayName: 'Bootstrap'
+      workingDirectory: $(System.DefaultWorkingDirectory)/tests
+
+    - bash: |
+        set -e
+        cp ./env.sh ./conf/env.sh
+        sed -i "s|TT_CLI_VERSION=.*|TT_CLI_VERSION=\"$(dp.cli.version)\"|g" ./conf/env.sh
+        ./run.bash install_cli
+      displayName: 'Test: install cli'
+      workingDirectory: $(System.DefaultWorkingDirectory)/tests
+
+    - bash: |
+        set -e
+        cp ./env.sh ./conf/env.sh
+        sed -i "s|TT_AGENT_VERSION=.*|TT_AGENT_VERSION=\"$(version)\"|g" ./conf/env.sh
+        sed -i "s|TT_REGISTRATION_TOKEN=.*|TT_REGISTRATION_TOKEN=\"$(agent.registration_token)\"|g" ./conf/env.sh
+        sed -i "s|TT_PROJECT=.*|TT_PROJECT=\"$(project)\"|g" ./conf/env.sh
+        ./run.bash install_agent
+      displayName: 'Test: install agent'
+      workingDirectory: $(System.DefaultWorkingDirectory)/tests
+
+    - bash: |
+        set -e
+        cp ./env.sh ./conf/env.sh
+        sed -i "s|TT_PROJECT=.*|TT_PROJECT=\"$(project)\"|g" ./conf/env.sh
+        sed -i "s|TT_ACCESS_KEY=.*|TT_ACCESS_KEY=\"$(cli.access_key)\"|g" ./conf/env.sh
+        ./run.bash ssh
+      displayName: 'Test: ssh'
+      workingDirectory: $(System.DefaultWorkingDirectory)/tests

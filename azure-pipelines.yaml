@@ -83,6 +83,17 @@ stages:
           set -e
           az storage blob upload-batch -d downloads/agent/latest -s ./dist/agent/$(version)/ --account-name deviceplanedownloads --account-key $(az.storage_account_key)
 
+    - task: AzureCLI@2
+      condition: eq(variables.isTaggedCommit, 'yes')
+      displayName: Upload install.sh
+      inputs:
+        azureSubscription: AzureSubscription
+        scriptType: bash
+        scriptLocation: inlineScript
+        inlineScript: |
+          set -e
+          az storage blob upload --account-name deviceplanedownloads --account-key $(az.storage_account_key) --container-name downloads --file script/install.sh --name install.sh
+
 - stage: Test
   jobs:
   - job: Test

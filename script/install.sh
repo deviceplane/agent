@@ -198,7 +198,7 @@ TasksMax=infinity
 TimeoutStartSec=0
 Restart=always
 RestartSec=5s
-ExecStart=sh ${BIN_DIR}/dp.sh
+ExecStart=/bin/sh ${BIN_DIR}/dp.sh
 
 EOF
 }

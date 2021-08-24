@@ -4,11 +4,11 @@ set -e
 # --- helper functions for logs ---
 info()
 {
-    echo '[INFO] ' "$@"
+    echo "[INFO] $@"
 }
 fatal()
 {
-    echo '[ERROR] ' "$@" >&2
+    echo "[ERROR] $@" >&2
     exit 1
 }
 
@@ -36,43 +36,43 @@ setup_env() {
     SYSTEM_NAME=deviceplane-agent
 
     # --- set related files from system name ---
-    SERVICE="${SYSTEM_NAME}.service"
+    SERVICE="$SYSTEM_NAME.service"
 
     # --- use sudo if we are not already root ---
     SUDO=sudo
-    if [ $(id -u) -eq 0 ]; then
+    if [ "$(id -u)" -eq 0 ]; then
         SUDO=
     fi
 
     # --- use binary install directory if defined or create default ---
-    if [ -n "${INSTALL_BIN_DIR}" ]; then
-        BIN_DIR="${INSTALL_BIN_DIR}"
+    if [ -n "$INSTALL_BIN_DIR" ]; then
+        BIN_DIR="$INSTALL_BIN_DIR"
     else
         BIN_DIR=/usr/local/bin
     fi
 
     # --- use systemd directory if defined or create default ---
-    if [ -n "${INSTALL_SYSTEMD_DIR}" ]; then
-        SYSTEMD_DIR="${INSTALL_SYSTEMD_DIR}"
+    if [ -n "$INSTALL_SYSTEMD_DIR" ]; then
+        SYSTEMD_DIR="$INSTALL_SYSTEMD_DIR"
     else
         SYSTEMD_DIR=/etc/systemd/system
     fi
 
     # --- service file location ---
-    FILE_SERVICE="${SYSTEMD_DIR}/${SERVICE}"
+    FILE_SERVICE="$SYSTEMD_DIR/$SERVICE"
 
     # --- deviceplane project ---
-    if [ -z "${PROJECT}" ]; then
+    if [ -z "$PROJECT" ]; then
         fatal "PROJECT is a required environment variable"
     fi
 
     # --- deviceplane registration token ---
-    if [ -z "${REGISTRATION_TOKEN}" ]; then
+    if [ -z "$REGISTRATION_TOKEN" ]; then
         fatal "REGISTRATION_TOKEN is a required environment variable"
     fi
 
     # --- deviceplane controller ---
-    if [ -z "${CONTROLLER}" ]; then
+    if [ -z "$CONTROLLER" ]; then
         CONTROLLER=https://cloud.deviceplane.com:443/api
     fi
 }
@@ -80,7 +80,7 @@ setup_env() {
 # --- set arch and suffix, fatal if architecture not supported ---
 setup_verify_arch() {
     if [ -z "$ARCH" ]; then
-        ARCH=$(uname -m)
+        ARCH="$(uname -m)"
     fi
     case "$ARCH" in
         amd64)
@@ -106,22 +106,22 @@ setup_verify_arch() {
 # --- verify existence of network downloader executable ---
 verify_downloader() {
     # Return failure if it doesn't exist or is no executable
-    [ -x "$(which $1)" ] || return 1
+    [ -x "$(which "$1")" ] || return 1
 
     # Set verified executable as our downloader program and return success
-    DOWNLOADER=$1
+    DOWNLOADER="$1"
     return 0
 }
 
 # --- create tempory directory and cleanup when done ---
 setup_tmp() {
     TMP_DIR=$(mktemp -d -t deviceplane.XXXXXXXXXX)
-    TMP_BIN="${TMP_DIR}/deviceplane-agent"
+    TMP_BIN="$TMP_DIR/deviceplane-agent"
     cleanup() {
         code="$?"
         set +e
         trap - EXIT
-        rm -rf "${TMP_DIR}"
+        rm -rf "$TMP_DIR"
         exit "$code"
     }
     trap cleanup INT EXIT
@@ -144,27 +144,27 @@ download() {
     esac
 
     # Abort if download command failed
-    [ $? -eq 0 ] || fatal 'Download failed'
+    [ "$?" -eq 0 ] || fatal 'Download failed'
 }
 
 # --- download binary from github url ---
 download_binary() {
-    BIN_URL="https://downloads.deviceplane.com/agent/${VERSION}/linux/${ARCH}/deviceplane-agent"
-    info "Downloading binary ${BIN_URL}"
-    download "${TMP_BIN}" "${BIN_URL}"
+    BIN_URL="https://downloads.deviceplane.com/agent/$VERSION/linux/$ARCH/deviceplane-agent"
+    info "Downloading binary $BIN_URL"
+    download "$TMP_BIN" "$BIN_URL"
 }
 
 # --- setup permissions and move binary to system directory ---
 setup_binary() {
-    chmod 755 "${TMP_BIN}"
-    info "Installing deviceplane-agent to ${BIN_DIR}/deviceplane-agent"
-    $SUDO chown root:root "${TMP_BIN}"
-    $SUDO mv -f "${TMP_BIN}" "${BIN_DIR}/deviceplane-agent"
-    $SUDO tee "${BIN_DIR}/dp.sh" >/dev/null << EOF
+    chmod 755 "$TMP_BIN"
+    info "Installing deviceplane-agent to $BIN_DIR/deviceplane-agent"
+    $SUDO chown root:root "$TMP_BIN"
+    $SUDO mv -f "$TMP_BIN" "$BIN_DIR/deviceplane-agent"
+    $SUDO tee "$BIN_DIR/dp.sh" >/dev/null << EOF
 #/bin/sh
-${BIN_DIR}/deviceplane-agent --controller=${CONTROLLER} --project=${PROJECT} --registration-token=${REGISTRATION_TOKEN}
+$BIN_DIR/deviceplane-agent --controller=$CONTROLLER --project=$PROJECT --registration-token=$REGISTRATION_TOKEN}
 EOF
-    $SUDO chmod +x "${BIN_DIR}/dp.sh"
+    $SUDO chmod +x "$BIN_DIR/dp.sh"
 }
 
 # --- download and verify ---
@@ -178,8 +178,8 @@ download_and_verify() {
 
 # --- write systemd service file ---
 create_systemd_service_file() {
-    info "systemd: Creating service file ${FILE_SERVICE}"
-    $SUDO tee "${FILE_SERVICE}" >/dev/null << EOF
+    info "systemd: Creating service file $FILE_SERVICE"
+    $SUDO tee "$FILE_SERVICE" >/dev/null << EOF
 [Unit]
 Description=Deviceplane agent
 Documentation=https://deviceplane.com/docs/
@@ -198,21 +198,21 @@ TasksMax=infinity
 TimeoutStartSec=0
 Restart=always
 RestartSec=5s
-ExecStart=/bin/sh ${BIN_DIR}/dp.sh
+ExecStart=/bin/sh $BIN_DIR/dp.sh
 
 EOF
 }
 
 # --- enable and start systemd service ---
 systemd_enable() {
-    info "systemd: Enabling "${SYSTEM_NAME}" unit"
-    $SUDO systemctl enable "${FILE_SERVICE}" >/dev/null
+    info "systemd: Enabling "$SYSTEM_NAME" unit"
+    $SUDO systemctl enable "$FILE_SERVICE" >/dev/null
     $SUDO systemctl daemon-reload >/dev/null
 }
 
 systemd_start() {
-    info "systemd: Starting ${SYSTEM_NAME}"
-    $SUDO systemctl restart "${SYSTEM_NAME}"
+    info "systemd: Starting $SYSTEM_NAME"
+    $SUDO systemctl restart "$SYSTEM_NAME"
 }
 
 # --- run the install process --

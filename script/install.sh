@@ -189,7 +189,6 @@ Wants=network-online.target
 WantedBy=multi-user.target
 
 [Service]
-KillMode=process
 Delegate=yes
 LimitNOFILE=infinity
 LimitNPROC=infinity

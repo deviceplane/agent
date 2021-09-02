@@ -162,7 +162,7 @@ setup_binary() {
     $SUDO mv -f "$TMP_BIN" "$BIN_DIR/deviceplane-agent"
     $SUDO tee "$BIN_DIR/dp.sh" >/dev/null << EOF
 #/bin/sh
-$BIN_DIR/deviceplane-agent --controller=$CONTROLLER --project=$PROJECT --registration-token=$REGISTRATION_TOKEN}
+$BIN_DIR/deviceplane-agent --controller=$CONTROLLER --project=$PROJECT --registration-token=$REGISTRATION_TOKEN
 EOF
     $SUDO chmod +x "$BIN_DIR/dp.sh"
 }
